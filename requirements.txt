@@ -1,3 +1,4 @@
+cairosvg>=2.6.0
 feedparser==6.0.10
 MLB_StatsAPI>=1.6.1
 # PIL is affected by CVE-2023-4863

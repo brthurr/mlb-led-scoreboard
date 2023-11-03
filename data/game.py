@@ -1,12 +1,10 @@
+import debug
 import os
 import time
 from datetime import datetime
 from typing import Optional
 
-import requests
-import cairosvg
-from PIL import Image
-from io import BytesIO
+from .logo_manager import LogoManager
 
 import statsapi
 
@@ -51,35 +49,12 @@ class Game:
         self._broadcasts = broadcasts
         self._series_status = series_status
         self._status = {}
-
-    def fetch_and_save_logo(self, team_id):
-        url = f"https://www.mlbstatic.com/team-logos/{team_id}.svg"
-        response = requests.get(url)
-        
-        # Check if the request was successful
-        if response.status_code == 200:
-            # Convert SVG to PNG
-            png_output = BytesIO()
-            cairosvg.svg2png(bytestring=response.content, write_to=png_output)
-            
-            # Resize the PNG to 32x32
-            image = Image.open(png_output)
-            image_resized = image.resize((32, 32))
-            
-            # Ensure the directory exists
-            if not os.path.exists('team_logos'):
-                os.makedirs('team_logos')
-            
-            # Save the resized PNG
-            image_resized.save(f'team_logos/{team_id}.png', 'PNG')
-        else:
-            print(f"Failed to fetch logo for team_id: {team_id}")
-
+    
     def fetch_and_save_team_logos(self):
-        home_id = self.home_team_id()
-        away_id = self.away_team_id()
-        self.fetch_and_save_logo(home_id)
-        self.fetch_and_save_logo(away_id)
+        logo_manager = LogoManager()
+        home_abbr = self.home_abbreviation()
+        away_abbr = self.away_abbreviation()
+        logo_manager.fetch_and_save_team_logos(home_abbr, away_abbr)    
     
     def update(self, force=False) -> UpdateStatus:
         if force or self.__should_update():
@@ -104,6 +79,9 @@ class Game:
                         )
                     except:
                         debug.error("Failed to get game status from schedule")
+                        
+                # After successfully updating the game data, fetch and save logos
+                self.fetch_and_save_team_logos()
 
                 return UpdateStatus.SUCCESS
             except:
@@ -123,11 +101,6 @@ class Game:
 
     def home_abbreviation(self):
         return self._current_data["gameData"]["teams"]["home"]["abbreviation"]
-
-    def home_team_id(self):
-        home_abbr = self.home_abbreviation()
-        team_data = statsapi.lookup_team(home_abbr)
-        return team_data[0]['id'] if team_data else None
     
     def home_record(self):
         return self._current_data["gameData"]["teams"]["home"]["record"] or {}
@@ -155,11 +128,6 @@ class Game:
 
     def away_abbreviation(self):
         return self._current_data["gameData"]["teams"]["away"]["abbreviation"]
-    
-    def away_team_id(self):
-        away_abbr = self.away_abbreviation()
-        team_data = statsapi.lookup_team(away_abbr)
-        return team_data[0]['id'] if team_data else None
 
     def status(self):
         return self._status["detailedState"]
